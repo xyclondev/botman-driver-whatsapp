@@ -4,17 +4,20 @@ namespace Botman\Drivers\Whatsapp;
 
 use BotMan\BotMan\Drivers\HttpDriver;
 use BotMan\BotMan\Interfaces\UserInterface;
+use BotMan\BotMan\Messages\Attachments\Audio;
+use BotMan\BotMan\Messages\Attachments\File;
+use BotMan\BotMan\Messages\Attachments\Image;
+use BotMan\BotMan\Messages\Attachments\Video;
 use BotMan\BotMan\Messages\Incoming\Answer;
 use BotMan\BotMan\Messages\Incoming\IncomingMessage;
-use BotMan\BotMan\Messages\Outgoing\OutgoingMessage;
+use BotMan\BotMan\Messages\Outgoing\Question;
 use BotMan\BotMan\Users\User;
+use BotMan\Drivers\Whatsapp\Exceptions\WhatsappConnectionException;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\ParameterBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use BotMan\Drivers\Whatsapp\Extensions\ButtonTemplate as BT;
-use BotMan\Drivers\Whatsapp\Exeptions\WhatsappException;
-use BotMan\Drivers\Whatsapp\Exeptions\WhatsappConnectionException as WACE;
 
 class WhatsappDriver extends HttpDriver
 {
@@ -50,7 +53,9 @@ class WhatsappDriver extends HttpDriver
      */
     public function buildPayload(Request $request)
     {
-        $this->payload = new ParameterBag((array) json_decode($request->getContent(), true));
+        $parameters = (array) json_decode($request->getContent(), true);
+        $this->payload = new ParameterBag($parameters['entry'][0]['changes'][0]['value'] ?? []);
+
         $this->event = Collection::make((array) $this->payload->get('messages') ? (array) $this->payload->get('messages')[0] : $this->payload);
         $this->content = $request->getContent();
         $this->config = Collection::make($this->config->get('whatsapp', []));
@@ -152,7 +157,7 @@ class WhatsappDriver extends HttpDriver
     }
 
     /**
-     * @param string|\BotMan\BotMan\Messages\Outgoing\Question $message
+     * @param string|Question $message
      * @param IncomingMessage $matchingMessage
      * @param array $additionalParameters
      * @return $this
@@ -162,7 +167,8 @@ class WhatsappDriver extends HttpDriver
         $recipient = $matchingMessage->getRecipient() === '' ? $matchingMessage->getSender() : $matchingMessage->getRecipient();
 
         $parameters = array_merge_recursive([
-            'recipient_type' => 'individual',
+            //'recipient_type' => 'individual',
+            'messaging_product' => 'whatsapp',
             'to' => $recipient,
         ], $additionalParameters);
 
@@ -185,7 +191,7 @@ class WhatsappDriver extends HttpDriver
                 ];
             } else {
                 $parameters['text'] = [
-                    'body' => $message->text,
+                    'body' => $message->getText(),
                 ];
                 $parameters['type'] = 'text';
             }
@@ -204,6 +210,7 @@ class WhatsappDriver extends HttpDriver
      */
     public function sendPayload($payload)
     {
+
         if ($this->config->get('throw_http_exceptions')) {
             return $this->postWithExceptionHandling($this->buildApiUrl($this->endpoint), [], $payload, $this->buildAuthHeader(), true);
         }
@@ -225,10 +232,10 @@ class WhatsappDriver extends HttpDriver
      *
      * @param string $endpoint
      * @param array $parameters
-     * @param \BotMan\BotMan\Messages\Incoming\IncomingMessage $matchingMessage
-     * @return void
+     * @param IncomingMessage $matchingMessage
+     * @return Response
      */
-    public function sendRequest($endpoint, array $parameters, IncomingMessage $matchingMessage)
+    public function sendRequest($endpoint, array $parameters, IncomingMessage $matchingMessage) : Response
     {
         $parameters = array_replace_recursive([
             'to' => $matchingMessage->getRecipient(),
@@ -268,22 +275,23 @@ class WhatsappDriver extends HttpDriver
      * @param bool $asJSON
      * @param int $retryCount
      * @return Response
-     * @throws \Modules\ChatBot\Drivers\Whatsapp\WhatsappConnectionException
+     * @throws WhatsappConnectionException
      */
     private function postWithExceptionHandling(
         $url,
         array $urlParameters = [],
         array $postParameters = [],
         array $headers = [],
-        $asJSON = false,
+        bool $asJSON = false,
         int $retryCount = 0
-    ) {
+    ): Response {
         $response = $this->http->post($url, $urlParameters, $postParameters, $headers, $asJSON);
-        $responseData = json_decode($response->getContent(), true);
 
         if ($response->isSuccessful()) {
-            return $responseData;
+            return $response;
         }
+
+        $responseData = json_decode($response->getContent(), true);
 
         $responseData['errors']['code'] = $responseData['errors']['code'] ?? 'No description from Vendor';
         $responseData['errors']['title'] = $responseData['errors']['title'] ?? 'No error code from Vendor';
@@ -296,6 +304,6 @@ class WhatsappDriver extends HttpDriver
             "Post Parameters: ".print_r($postParameters, true)."\n".
             "Headers: ". print_r($headers, true)."\n";
 
-        throw new WACE($message);
+        throw new WhatsappConnectionException($message);
     }
 }
