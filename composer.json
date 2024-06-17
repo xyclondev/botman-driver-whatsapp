@@ -1,6 +1,6 @@
 {
-  "name": "lex/driver-whatsapp",
-  "version": "v0.0.99",
+  "name": "xyclondev/botman-driver-whatsapp",
+  "version": "v0.1.0",
   "license": "MIT",
   "description": "WABA On-Premise driver for BotMan",
   "keywords": [
@@ -9,12 +9,16 @@
       "WhatsApp",
       "WABA"
   ],
-  "homepage": "http://github.com/irwan-runtuwene/driver-whatsapp",
+  "homepage": "https://github.com/xyclondev/botman-driver-whatsapp",
   "authors": [
-      {
-          "name": "S. Irwan Runtuwene",
-          "email": "stefanus.irwant@gmail.com"
-      }
+    {
+        "name": "S. Irwan Runtuwene",
+        "email": "stefanus.irwant@gmail.com"
+    },
+    {
+        "name": "Gonzalo Massa",
+        "email": "gonzalom@xyclon.com.ar"
+    }
   ],
   "require": {
       "php": ">=7.0",
