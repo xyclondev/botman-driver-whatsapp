@@ -153,7 +153,21 @@ class WhatsappDriver extends HttpDriver
      */
     public function getConversationAnswer(IncomingMessage $message)
     {
-        return Answer::create($message->getText())->setMessage($message);
+        $answer = Answer::create($message->getText())->setMessage($message);
+
+        $payload = $message->getPayload();
+
+        if ($payload && $payload->get('messages')[0]['type'] === 'interactive') {
+
+            $interactiveElement = $payload->get('messages')[0]['interactive'];
+            if ($interactiveElement['type'] === 'button_reply') {
+                $answer->setValue($interactiveElement['button_reply']['id']);
+                $answer->setInteractiveReply(true);
+            }
+
+        }
+
+        return $answer;
     }
 
     /**
@@ -177,6 +191,23 @@ class WhatsappDriver extends HttpDriver
                 'body' => $message->getText()
             ];
             $parameters['type'] = 'text';
+
+            $buttons = $this->messageActionsToButtons($message->getActions());
+
+            if (count($buttons)) {
+                if (count($buttons) > 3) throw new \Exception('WhatsappDriver does not support more than three buttons');
+
+                $parameters['type'] = 'interactive';
+                $parameters['interactive'] = [
+                    'type'   => 'button',
+                    'body'   => [
+                        'text' => $message->getText()
+                    ],
+                    'action' => [
+                        'buttons' => $buttons
+                    ]
+                ];
+            }
         } elseif (is_object($message) && in_array(get_class($message), $this->templates)) {
             if (get_class($message) === BT::class) {
                 $parameters['type'] = 'interactive';
@@ -305,5 +336,28 @@ class WhatsappDriver extends HttpDriver
             "Headers: ". print_r($headers, true)."\n";
 
         throw new WhatsappConnectionException($message);
+    }
+
+    private function messageActionsToButtons(array $actions): array
+    {
+        $buttons = [];
+
+        foreach ($actions as $action) {
+            if ($action['type'] !== 'button') continue;
+            $buttons[] = $this->convertActionToWhatsAppButton($action);
+        }
+
+        return $buttons;
+    }
+
+    private function convertActionToWhatsAppButton(array $buttonAction): array
+    {
+        return [
+            'type'  => 'reply',
+            'reply' => [
+                'id'    => $buttonAction['value'],
+                'title' => $buttonAction['text']
+            ]
+        ];
     }
 }
