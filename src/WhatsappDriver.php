@@ -68,7 +68,7 @@ class WhatsappDriver extends HttpDriver
      */
     public function matchesRequest()
     {
-        return !is_null($this->payload->get('contacts')) || !is_null($this->event->get('from'));
+        return $this->payload->get('messaging_product') === 'whatsapp';
     }
 
     /**
