@@ -116,9 +116,23 @@ class WhatsappDriver extends HttpDriver
                     )
                 ];
             } elseif ($this->event->get('type') == 'button' || $this->event->get('type') == 'interactive') {
+
+                $interactive = $this->event->get('interactive');
+
+                if(isset($interactive['button_reply'])) {
+                    $message = $interactive['button_reply']['title'];
+
+                } elseif (isset($interactive['list_reply'])) {
+                    $message = $interactive['list_reply']['title'];
+
+                } else {
+                    $message = $this->event->get('button')['text'] ?? '';
+
+                }
+
                 $this->messages = [
                     new IncomingMessage(
-                        isset($this->event->get('button')['text'])?$this->event->get('button')['text']:$this->event->get('interactive')['button_reply']['title'],
+                        $message,
                         $this->event->get('from'),
                         $this->event->get('from'),
                         $this->payload
@@ -162,6 +176,9 @@ class WhatsappDriver extends HttpDriver
             $interactiveElement = $payload->get('messages')[0]['interactive'];
             if ($interactiveElement['type'] === 'button_reply') {
                 $answer->setValue($interactiveElement['button_reply']['id']);
+                $answer->setInteractiveReply(true);
+            } elseif ($interactiveElement['type'] === 'list_reply') {
+                $answer->setValue($interactiveElement['list_reply']['id']);
                 $answer->setInteractiveReply(true);
             }
 
@@ -208,6 +225,20 @@ class WhatsappDriver extends HttpDriver
                     ]
                 ];
             }
+
+            $action = $this->messageActionsToInteractiveList($message->getActions());
+
+            if (!empty($action)) {
+                $parameters['type'] = 'interactive';
+                $parameters['interactive'] = [
+                    'type'   => 'list',
+                    'body'   => [
+                        'text' => $message->getText()
+                    ],
+                    'action' => $action
+                ];
+            }
+
         } elseif (is_object($message) && in_array(get_class($message), $this->templates)) {
             if (get_class($message) === BT::class) {
                 $parameters['type'] = 'interactive';
@@ -358,6 +389,37 @@ class WhatsappDriver extends HttpDriver
                 'id'    => $buttonAction['value'],
                 'title' => $buttonAction['text']
             ]
+        ];
+    }
+
+    /**
+     * @param array $actions
+     * @return array
+     */
+    private function messageActionsToInteractiveList(array $actions)
+    {
+        if (($actions[0]['type'] ?? null) !== 'select') return [];
+
+        $action = $actions[0];
+        $actionTitle = $action['text'];
+
+        $rows = [];
+
+        foreach ($action['options'] as $option) {
+            $rows[] = [
+                'id'    => $option['value'],
+                'title' => $option['text']
+            ];
+        }
+
+        return [
+            'sections' => [
+                [
+                    'title' => $actionTitle,
+                    'rows'  => $rows,
+                ]
+            ],
+            'button'   => $actionTitle
         ];
     }
 }
