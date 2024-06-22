@@ -261,11 +261,16 @@ class WhatsappDriver extends HttpDriver
         } elseif (get_class($message) === OutgoingMessage::class) {
             $attachment = $message->getAttachment();
 
-            if (get_class($attachment) === Image::class) {
+            if (!isNull($attachment) && get_class($attachment) === Image::class) {
                 $parameters['type'] = 'image';
                 $parameters['image'] = [
                     'link' => $attachment->getUrl()
                 ];
+            } else {
+                $parameters['text'] = [
+                    'body' => $message->getText(),
+                ];
+                $parameters['type'] = 'text';
             }
         } else {
             $parameters['text'] = [
