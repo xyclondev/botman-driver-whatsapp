@@ -10,6 +10,7 @@ use BotMan\BotMan\Messages\Attachments\Image;
 use BotMan\BotMan\Messages\Attachments\Video;
 use BotMan\BotMan\Messages\Incoming\Answer;
 use BotMan\BotMan\Messages\Incoming\IncomingMessage;
+use BotMan\BotMan\Messages\Outgoing\OutgoingMessage;
 use BotMan\BotMan\Messages\Outgoing\Question;
 use BotMan\BotMan\Users\User;
 use BotMan\Drivers\Whatsapp\Exceptions\WhatsappConnectionException;
@@ -256,6 +257,15 @@ class WhatsappDriver extends HttpDriver
                     'body' => $message->getText(),
                 ];
                 $parameters['type'] = 'text';
+            }
+        } elseif (get_class($message) === OutgoingMessage::class) {
+            $attachment = $message->getAttachment();
+
+            if (get_class($attachment) === Image::class) {
+                $parameters['type'] = 'image';
+                $parameters['image'] = [
+                    'link' => $attachment->getUrl()
+                ];
             }
         } else {
             $parameters['text'] = [
